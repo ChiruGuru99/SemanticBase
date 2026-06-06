@@ -1,0 +1,26 @@
+spring:
+  flyway:
+    enabled: true
+  ai:
+    openai:
+      api-key: test-key
+      base-url: http://localhost:9999
+    ollama:
+      base-url: http://localhost:9998
+    vectorstore:
+      pgvector:
+        initialize-schema: false
+        dimensions: 768
+    model:
+      embedding: none
+      chat: none
+      audio:
+        speech: none
+        transcription: none
+      image: none
+      moderation: none
+
+logging:
+  level:
+    org.testcontainers: INFO
+    com.semanticbase: DEBUG

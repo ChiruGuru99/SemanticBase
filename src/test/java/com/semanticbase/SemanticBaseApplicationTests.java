@@ -1,14 +1,9 @@
 package com.semanticbase;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.context.annotation.Import;
 
-@TestPropertySource(properties = {
-        "spring.ai.openai.api-key=test-key",
-        "spring.ai.openai.base-url=http://localhost:9999",
-        "spring.ai.ollama.base-url=http://localhost:9998",
-        "spring.ai.vectorstore.pgvector.initialize-schema=false"
-})
+@Import(TestEmbeddingConfig.class)
 class SemanticBaseApplicationTests extends AbstractIntegrationTest {
 
     @Test
