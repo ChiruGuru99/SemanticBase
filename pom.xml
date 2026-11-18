@@ -23,6 +23,8 @@
         <spring-cloud.version>2024.0.0</spring-cloud.version>
         <tika.version>3.0.0</tika.version>
         <testcontainers.version>1.20.4</testcontainers.version>
+        <!-- Evals hit a running app with real models; run them with -Peval. -->
+        <excludedGroups>eval</excludedGroups>
     </properties>
 
     <dependencyManagement>
@@ -169,4 +171,14 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>eval</id>
+            <properties>
+                <groups>eval</groups>
+                <excludedGroups/>
+            </properties>
+        </profile>
+    </profiles>
 </project>
