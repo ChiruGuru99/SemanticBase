@@ -1,5 +1,6 @@
 package com.semanticbase.ingestion.pipeline;
 
+import com.semanticbase.cache.SemanticCache;
 import com.semanticbase.ingestion.chunk.SpringAiChunker;
 import com.semanticbase.ingestion.domain.Document;
 import com.semanticbase.ingestion.domain.IngestionStatus;
@@ -9,6 +10,7 @@ import com.semanticbase.ingestion.pii.PiiRedactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -30,17 +32,24 @@ public class IngestionService {
     private final SpringAiChunker chunker;
     private final VectorStore vectorStore;
     private final DocumentRepository documents;
+    private final SemanticCache cache;
+    // Calls through the proxy so @Async applies; a plain this.processAsync() runs on the request thread.
+    private final IngestionService self;
 
     public IngestionService(TikaExtractor extractor,
                             PiiRedactor redactor,
                             SpringAiChunker chunker,
                             VectorStore vectorStore,
-                            DocumentRepository documents) {
+                            DocumentRepository documents,
+                            SemanticCache cache,
+                            @Lazy IngestionService self) {
         this.extractor = extractor;
         this.redactor = redactor;
         this.chunker = chunker;
         this.vectorStore = vectorStore;
         this.documents = documents;
+        this.cache = cache;
+        this.self = self;
     }
 
     public IngestResult submit(byte[] bytes, String contentType, String sourceName) {
@@ -54,7 +63,7 @@ public class IngestionService {
                 .orElseGet(() -> {
                     Document created = documents.insertPending(tenantId, sourceName, contentType,
                             bytes.length, checksum);
-                    processAsync(created.id(), bytes, contentType, sourceName, tenantId);
+                    self.processAsync(created.id(), bytes, contentType, sourceName, tenantId);
                     return new IngestResult(created.id(), IngestionStatus.PENDING, false);
                 });
     }
@@ -87,6 +96,8 @@ public class IngestionService {
             vectorStore.add(aiDocs);
 
             documents.updateStatus(documentId, IngestionStatus.COMPLETED);
+            // New content can change answers, so cached ones for this tenant are stale.
+            cache.purge(tenantId);
             log.info("Ingested document {} ({} chunks)", documentId, chunks.size());
         } catch (Exception e) {
             log.error("Ingestion failed for document {}", documentId, e);

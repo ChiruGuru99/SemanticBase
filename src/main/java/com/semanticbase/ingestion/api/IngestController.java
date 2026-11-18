@@ -29,7 +29,9 @@ public class IngestController {
     }
 
     @PostMapping(value = "/ingest", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<IngestResponse> ingest(@RequestParam("file") MultipartFile file) throws IOException {
+    public ResponseEntity<IngestResponse> ingest(@RequestParam("file") MultipartFile file,
+                                                 @RequestParam(defaultValue = "default") String tenantId)
+            throws IOException {
         if (file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file is empty");
         }
@@ -38,7 +40,7 @@ public class IngestController {
         String sourceName = file.getOriginalFilename() != null
                 ? file.getOriginalFilename() : "unnamed";
 
-        IngestResult result = ingestion.submit(file.getBytes(), contentType, sourceName);
+        IngestResult result = ingestion.submit(file.getBytes(), contentType, sourceName, tenantId);
 
         HttpStatus status = result.duplicate() ? HttpStatus.OK : HttpStatus.ACCEPTED;
         return ResponseEntity.status(status)
