@@ -1,0 +1,9 @@
+# Local-profile overrides. Activated when SPRING_PROFILES_ACTIVE=local (the default).
+# Place in your config repo as semanticbase-local.yml.
+#
+# Currently a no-op — the defaults in semanticbase.yml are already tuned for local dev.
+# Use this file when local needs to diverge from defaults (e.g. different DB, lower cache TTL).
+
+logging:
+  level:
+    com.semanticbase: DEBUG

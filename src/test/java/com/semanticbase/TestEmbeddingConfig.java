@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * Deterministic stub embedding model for integration tests. Avoids hitting Ollama.
+ * Deterministic stub embedding model for integration tests. Avoids calling a real embedding provider.
  * Same input string always yields the same vector (seeded RNG).
  */
 @TestConfiguration

@@ -378,7 +378,7 @@
                 }
             }
             // Heuristic: a single delta event means the answer arrived in one shot,
-            // which is the cache-hit code path. Live Groq streaming emits many deltas.
+            // which is the cache-hit code path. Live model streaming emits many deltas.
             if (deltaCount === 1) {
                 const existing = cites.dataset.citations;
                 if (existing) {

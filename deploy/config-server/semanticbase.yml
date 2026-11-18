@@ -1,0 +1,55 @@
+# Default config served by Spring Cloud Config Server for `semanticbase` (any profile).
+# Place this in the config repo backing your config server (e.g. config-repo/semanticbase.yml).
+#
+# Profile-specific overrides go in semanticbase-<profile>.yml (e.g. semanticbase-local.yml,
+# semanticbase-prod.yml). Spring merges defaults from this file with profile overrides.
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/semanticbase
+    username: postgres
+    # Resolve from env so the secret never lives in the config repo.
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2s
+
+  ai:
+    # Chat: any OpenAI-compatible provider (Groq, Cloudflare, NVIDIA, Azure v1, self-hosted vLLM).
+    # To switch, change base-url + model here or override them in semanticbase-<profile>.yml;
+    # values per provider are in the README "Chat providers" table.
+    # Spring AI calls {base-url}/v1/chat/completions, so base-url never ends in /v1.
+    openai:
+      base-url: https://api.groq.com/openai
+      # Secret: resolved from the client's env so it never lands in the config repo.
+      # For prod, prefer Vault-backed config server values.
+      api-key: ${LLM_API_KEY}
+      chat:
+        options:
+          model: openai/gpt-oss-120b
+          temperature: 0.2
+      # Embeddings: any OpenAI-compatible provider (Ollama, Cloudflare, OpenAI, Azure v1); values per
+      # provider are in the README "Embedding providers" table. Spring AI calls {base-url}/v1/embeddings.
+      # The model MUST output 768-dim vectors (pgvector schema). Switching models changes the vector
+      # space: re-ingest documents and purge the answer cache afterwards.
+      embedding:
+        base-url: http://localhost:11434
+        # Secret from env, set explicitly so the chat key is never sent to the embedding provider.
+        # Ollama ignores the value, but Spring AI requires one.
+        api-key: ${EMBEDDING_API_KEY}
+        options:
+          model: nomic-embed-text
+
+semanticbase:
+  cache:
+    enabled: true
+    ttl: 24h
+    semantic:
+      # Tuned for nomic-embed-text; retune when switching embedding models (raise toward 0.97 for stronger ones).
+      threshold: 0.92
+      max-entries-per-tenant: 200

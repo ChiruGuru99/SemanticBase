@@ -23,8 +23,8 @@ final class CacheKeys {
         return PREFIX + ":semantic:" + tenantId;
     }
 
-    static String tenantPattern(String tenantId) {
-        return PREFIX + ":*:" + tenantId + "*";
+    static String exactKeyPattern(String tenantId) {
+        return PREFIX + ":exact:" + tenantId + ":*";
     }
 
     private static String sha256(String input) {

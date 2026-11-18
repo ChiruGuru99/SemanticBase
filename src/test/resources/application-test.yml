@@ -5,15 +5,14 @@ spring:
     openai:
       api-key: test-key
       base-url: http://localhost:9999
-    ollama:
-      base-url: http://localhost:9998
     vectorstore:
       pgvector:
         initialize-schema: false
         dimensions: 768
     model:
       embedding: none
-      chat: none
+      # ChatController needs a ChatClient.Builder; points at the dead base-url above.
+      chat: openai
       audio:
         speech: none
         transcription: none

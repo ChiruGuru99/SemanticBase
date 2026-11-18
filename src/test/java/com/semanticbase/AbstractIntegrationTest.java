@@ -8,7 +8,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
-@SpringBootTest
+// application.yml imports the config server with fail-fast; tests run without one.
+@SpringBootTest(properties = "spring.cloud.config.enabled=false")
 @ActiveProfiles("test")
 @Testcontainers(disabledWithoutDocker = true)
 public abstract class AbstractIntegrationTest {
