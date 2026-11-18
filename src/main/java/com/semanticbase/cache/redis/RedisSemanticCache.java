@@ -14,6 +14,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -117,10 +118,18 @@ public class RedisSemanticCache implements SemanticCache {
 
     @Override
     public long purge(String tenantId) {
-        Set<String> keys = redis.keys(CacheKeys.tenantPattern(tenantId));
-        if (keys == null || keys.isEmpty()) return 0L;
-        Long deleted = redis.delete(keys);
-        return deleted == null ? 0L : deleted;
+        try {
+            Set<String> keys = new HashSet<>();
+            Set<String> exact = redis.keys(CacheKeys.exactKeyPattern(tenantId));
+            if (exact != null) keys.addAll(exact);
+            keys.add(CacheKeys.semanticListKey(tenantId));
+            Long deleted = redis.delete(keys);
+            return deleted == null ? 0L : deleted;
+        } catch (Exception e) {
+            log.warn("Cache purge failed for tenant {}", tenantId, e);
+            meterRegistry.counter("semanticbase.cache.error", "op", "purge").increment();
+            return 0L;
+        }
     }
 
     static double cosine(float[] a, float[] b) {
