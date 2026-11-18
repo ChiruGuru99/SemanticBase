@@ -1,0 +1,101 @@
+name: RAG eval
+
+# Manual only: it spends model-provider quota and LLM scores vary a little run to run.
+on:
+  workflow_dispatch:
+    inputs:
+      delay-ms:
+        description: Pause between questions (raise if the chat provider rate-limits)
+        default: '15000'
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # Stand-ins for the hosts in deploy/config-server/semanticbase.yml (localhost Postgres, Redis, Ollama).
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: semanticbase
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+      ollama:
+        image: ollama/ollama:0.40.7
+        ports: ['11434:11434']
+
+    env:
+      # No config server in CI: load the config-server template directly, so the run uses the
+      # same provider URLs and models you ship.
+      SPRING_CLOUD_CONFIG_ENABLED: 'false'
+      SPRING_CONFIG_ADDITIONAL_LOCATION: file:deploy/config-server/semanticbase.yml
+      # Throwaway service-container password, not a real secret.
+      SPRING_DATASOURCE_PASSWORD: postgres
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      # Ollama ignores the key; set the secret when the template points at a hosted embedding provider.
+      EMBEDDING_API_KEY: ${{ secrets.EMBEDDING_API_KEY || 'unused-by-ollama' }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - run: chmod +x mvnw
+
+      - name: Check secrets
+        run: |
+          if [ -z "$LLM_API_KEY" ]; then
+            echo "::error::Add the LLM_API_KEY repository secret (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+
+      - name: Pull the embedding model when the template uses Ollama
+        run: |
+          cfg=deploy/config-server/semanticbase.yml
+          url=$(yq '.spring.ai.openai.embedding["base-url"]' "$cfg")
+          model=$(yq '.spring.ai.openai.embedding.options.model' "$cfg")
+          if [[ "$url" == http://localhost:11434* ]]; then
+            # The service container may still be starting.
+            curl -sf --retry 10 --retry-connrefused --retry-delay 3 \
+              http://localhost:11434/api/pull -d "{\"model\":\"$model\",\"stream\":false}"
+          else
+            echo "Embeddings use $url; nothing to pull."
+          fi
+
+      - name: Build
+        run: ./mvnw -B -DskipTests package
+
+      - name: Start SemanticBase
+        run: |
+          nohup java -jar target/semanticbase-*.jar > app.log 2>&1 &
+          base=$(grep '^eval.base-url=' src/test/resources/eval/eval.properties | cut -d= -f2-)
+          timeout 300 bash -c "until curl -sf $base/actuator/health > /dev/null; do sleep 3; done" \
+            || { tail -n 100 app.log; exit 1; }
+
+      - name: Run eval
+        env:
+          DELAY_MS: ${{ inputs.delay-ms }}
+        run: ./mvnw -B test -Peval "-Deval.delay-ms=$DELAY_MS"
+
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eval-results
+          path: |
+            app.log
+            target/surefire-reports/
+          if-no-files-found: ignore
